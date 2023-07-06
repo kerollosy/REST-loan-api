@@ -13,9 +13,6 @@ class Command(BaseCommand):
         due_payments = Payment.objects.filter(
             status="PENDING", due_date__lte=datetime.date.today())
 
-        for payment in Payment.objects.all():
-            self.stdout.write(self.style.HTTP_INFO(payment.due_date))
-
         if due_payments:
             for payment in due_payments:
                 loan = payment.loan
