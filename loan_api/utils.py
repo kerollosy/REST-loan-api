@@ -25,12 +25,12 @@ def calculate_payment_dates(funding_date, loan_period):
 def calculate_monthly_payment(loan_amount, loan_period, annual_interest_rate):
     loan_period_months = calculate_loan_period_month(loan_period)
 
-    base = loan_amount / loan_period_months
+    base = Decimal(loan_amount / loan_period_months)
 
     fee = loan_amount * Decimal(5 / 100)
     monthly_fee = fee / loan_period_months
 
-    monthly_interest_rate = (annual_interest_rate / 100) / 12
+    monthly_interest_rate = Decimal(annual_interest_rate / 100) / 12
     monthly_interest = monthly_interest_rate * loan_amount
 
     monthly_payment = base + monthly_fee + monthly_interest
