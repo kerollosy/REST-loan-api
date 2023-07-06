@@ -3,6 +3,8 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 from rest_framework import status
 from .models import Investor, Borrower, Loan, Offer, Payment
+from .utils import calculate_monthly_payment
+from django.core.management import call_command
 
 
 class LoanTestCase(TestCase):
@@ -39,11 +41,32 @@ class LoanTestCase(TestCase):
 
     def test_accept_offer(self):
         offer = Offer.objects.create(
-            loan=self.loan, interest=15, investor=self.investor)
-        response = self.client.post(
-            f'/api/offers/{offer.id}/accept/', format='json')
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(Loan.objects.get(id=self.loan.id).status, 'FUNDED')
+            loan=self.loan, interest=15, investor=self.investor
+        )
+        response = self.client.get(f'/api/loans/{self.loan.pk}/offers/').json()
+        self.assertEqual(response[0]["loan"], self.loan.pk)
+
+        investor_balance_before = self.investor.balance
+
+        response = self.client.post(f'/api/offers/{offer.pk}/accept/').json()
+        self.assertEqual(response["message"], "Loan funded successfully")
+
+        self.loan.refresh_from_db()
+        self.assertEqual(self.loan.status, "FUNDED")
+
+        self.borrower.refresh_from_db()
+        self.assertEqual(self.borrower.balance, 5000)
+
+        self.investor.refresh_from_db()
+        self.assertEqual(
+            int(self.investor.balance),
+            investor_balance_before -
+            int(self.loan.loan_amount) -
+            (int(self.loan.loan_amount) * (5 / 100))
+        )
+
+        response = self.client.post(f'/api/offers/{offer.pk}/accept/').json()
+        self.assertEqual(response["error"], 'This loan is already funded')
 
     def test_process_payments(self):
         offer = Offer.objects.create(
@@ -51,13 +74,28 @@ class LoanTestCase(TestCase):
         self.loan.status = 'FUNDED'
         self.loan.investor = self.investor
         self.loan.save()
-        Payment.objects.create(loan=self.loan, due_date=datetime.date.today())
-        response = self.client.post('/api/process-payments/', format='json')
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(int(Borrower.objects.get(id=self.borrower.id).balance), int(
-            self.loan.loan_amount / (self.loan.loan_period / 30)))
-        self.assertEqual(Payment.objects.get(id=1).status, 'PAID')
+        payment = Payment.objects.create(
+            loan=self.loan, due_date=datetime.date.today())
 
-    def test_process_payments_no_pending_payments(self):
-        response = self.client.post('/api/process-payments/', format='json')
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        borrower_balance_before = self.borrower.balance
+        call_command('process_payments')
+
+        self.borrower.refresh_from_db()
+        self.assertEqual(
+            int(self.borrower.balance),
+            borrower_balance_before -
+            int(calculate_monthly_payment(
+                self.loan.loan_amount,
+                self.loan.loan_period,
+                offer.interest
+            ))
+        )
+
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, 'PAID')
+
+        offer.refresh_from_db()
+        self.assertEqual(offer.status, 'PAID')
+
+        self.loan.refresh_from_db()
+        self.assertEqual(self.loan.status, 'COMPLETED')
