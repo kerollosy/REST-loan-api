@@ -4,7 +4,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from .serializers import LoanSerializer, OfferSerializer, InvestorSerializer, BorrowerSerializer
 from .models import Investor, Borrower, Loan, Offer, Payment
-from .utils import calculate_payment_dates, calculate_repayment
+from .utils import calculate_payment_dates, calculate_monthly_payment
 from rest_framework import status
 from decimal import Decimal
 import datetime
@@ -120,9 +120,6 @@ def create_offer(request):
         fee = loan.loan_amount * Decimal(5/100)
 
         if investor.balance > (loan.loan_amount + fee):
-            loan.investor = investor
-            loan.save()
-
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
@@ -160,18 +157,26 @@ def accept_offer(request, pk):
         # In case the investor creates more than one offer and runs out of money
         if investor.balance < (loan.loan_amount + fee):
             return Response({"error": "Insufficient Funds"}, status=status.HTTP_400_BAD_REQUEST)
-        
-        
+
+
         offer.status = "ACCEPTED"
         offer.save()
 
+
         loan.status = "FUNDED"
         loan.funded_date = datetime.date.today()
+        loan.investor = investor
         loan.save()
 
 
         investor.balance -= (loan.loan_amount + fee)
         investor.save()
+
+
+        borrower = loan.borrower
+        borrower.balance += loan.loan_amount
+        borrower.save()
+
 
         payment_dates = calculate_payment_dates(
             datetime.date.today(), loan.loan_period)
@@ -205,10 +210,18 @@ def process_payments(request):
             elif loan.status == "COMPLETED":
                 return Response({"error": "Loan is Completed"}, status=status.HTTP_400_BAD_REQUEST)
 
+            # Deduct monthly payment from borrower's balance
+            monthly_payment = calculate_monthly_payment(
+                loan.loan_amount, loan.loan_period, loan.offer.first().interest
+            )
             borrower = loan.borrower
-            borrower.balance += Decimal(loan.loan_amount /
-                                        math.ceil(loan.loan_period / 30))
+            borrower.balance -= monthly_payment
             borrower.save()
+
+            # Add monthly payment to investor's balance
+            investor = loan.investor
+            investor.balance += monthly_payment
+            investor.save()
 
             # Update the payment status
             payment.status = "PAID"
@@ -226,11 +239,6 @@ def process_payments(request):
 
                 loan.status = "COMPLETED"
                 loan.save()
-
-                investor = loan.investor
-                investor.balance += Decimal(calculate_repayment(
-                    loan.loan_amount, loan.loan_period, offer.interest))
-                investor.save()
 
                 return Response({"message": "Loan Completed"}, status=status.HTTP_200_OK)
 
