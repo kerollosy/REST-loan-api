@@ -1,0 +1,5 @@
+__pycache__/
+curl/
+migrations/
+
+*.sqlite3
