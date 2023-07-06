@@ -20,7 +20,7 @@ class OfferAdmin(admin.ModelAdmin):
 
 
 class PaymentAdmin(admin.ModelAdmin):
-    list_display = ('loan', 'status')
+    list_display = ('loan', 'status', 'due_date')
 
 
 admin.site.register(Investor, InvestorAdmin)
