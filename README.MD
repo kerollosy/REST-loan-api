@@ -24,8 +24,6 @@ A borrower submitted a loan request for $5,000 to pay them back in 6 months. The
 * POST /api/create-offer/
 * POST /api/offers/{id}/accept/
 
-* POST /api/process-payments/
-
 ## Getting Started
 1. Clone the project repository: `git clone https://github.com/kerollosy/REST-loan-api.git`
 2. Open the directory: `cd REST-loan-api`
