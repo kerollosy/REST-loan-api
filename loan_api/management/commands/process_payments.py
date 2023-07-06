@@ -20,8 +20,10 @@ class Command(BaseCommand):
                 if loan.status == "PENDING":
                     self.stdout.write(self.style.ERROR(
                         "Loan is not being funded"))
+                    break
                 elif loan.status == "COMPLETED":
                     self.stdout.write(self.style.ERROR("Loan is Completed"))
+                    break
 
                 # Deduct monthly payment from borrower's balance
                 monthly_payment = calculate_monthly_payment(
@@ -53,9 +55,11 @@ class Command(BaseCommand):
                     loan.save()
 
                     self.stdout.write(self.style.SUCCESS("Loan Completed"))
+                    break
                 else:
                     self.stdout.write(self.style.SUCCESS(
                         "Payments processed successfully"))
+                    break
         else:
             self.stdout.write(self.style.ERROR(
                 "There are no pending payments"))
