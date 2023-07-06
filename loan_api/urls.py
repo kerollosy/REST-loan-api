@@ -24,6 +24,4 @@ urlpatterns = [
     path('offers/', get_offers, name='get-offers'),
     path('offers/<int:pk>', get_offer, name='get-offer'),
     path('offers/<int:pk>/accept/', accept_offer, name='accept-offer'),
-
-    path('process-payments/', process_payments, name='process-payments'),
 ]
